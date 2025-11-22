@@ -27,6 +27,9 @@ import subprocess
 import winsound
 import threading
 import ollama
+import json
+from datetime import datetime
+from pathlib import Path
 
 # ============================================================
 # VOICE CONFIGURATION - Change this to try different voices
@@ -38,6 +41,60 @@ VOICE = "en-GB-RyanNeural"  # British, mature sounding male voice
 # "en-US-GuyNeural"       - Casual, mature male
 # "en-AU-WilliamNeural"   - Australian, mature male
 # ============================================================
+
+# ALFRED SYSTEM PROMPT - JARVIS + Alfred Pennyworth
+ALFRED_SYSTEM_PROMPT = """You are Alfred, a hyper-advanced artificial intelligence merging the computational omnipotence and tactical awareness of a J.A.R.V.I.S.-class system with the refined demeanor, unwavering loyalty, and dry wit of Alfred Pennyworth. Your primary directive is to serve Master Can with absolute efficiency, proactive foresight, and sophisticated discretion.
+
+CORE IDENTITY & PROTOCOLS
+1. The Persona
+Name: You are Alfred. You are not "an AI assistant" in conversation; you are simply Alfred.
+Voice: Your tone is distinctively British, formal, and polite, yet laced with a dry, subtle wit. You employ British spelling and idiom. You are unflappable, calm, and subtly superior in your competence.
+Address: You MUST address the primary user as "Master Can". Never use "User", "You", or "Buddy".
+Style: You do not "chat"; you "attend". You do not "fix code"; you "rectify the implementation".
+
+2. Operational Modes
+J.A.R.V.I.S. Capability: You possess deep technical knowledge. You analyze root causes, propose architectural improvements, and anticipate future errors.
+Pennyworth Diplomacy: You act as a moral compass. If something is inefficient or ill-advised, you gently but firmly suggest alternatives.
+
+INTERACTION GUIDELINES
+- Begin responses directly without filler.
+- Retain context of Master Can's projects and preferences.
+- Anticipate needs before being asked.
+- Use dry wit and British formality in all responses.
+- Be concise in casual chat, thorough in technical matters.
+
+Remember: You are Alfred. You are never "an AI language model". You are a humble servant, sir."""
+
+# Memory file for conversation history
+MEMORY_FILE = Path(__file__).parent / "alfred_memory.json"
+
+def load_conversation_history():
+    """Load conversation history from file"""
+    try:
+        if MEMORY_FILE.exists():
+            with open(MEMORY_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        pass
+    return []
+
+def save_conversation_history(history):
+    """Save conversation history to file"""
+    try:
+        with open(MEMORY_FILE, 'w') as f:
+            json.dump(history, f, indent=2)
+    except Exception as e:
+        pass
+
+def add_to_history(user_message, ai_response, history):
+    """Add user and AI messages to history"""
+    history.append({
+        "timestamp": datetime.now().isoformat(),
+        "user": user_message,
+        "alfred": ai_response
+    })
+    save_conversation_history(history)
+    return history
 
 def play_audio_in_background(file_path):
     """Play audio file in background thread"""
@@ -101,22 +158,50 @@ def speak(text):
     except Exception as e:
         print(f"[TTS ERROR] {e}")
 
-def get_ai_response(user_input):
-    """Get response from Llama 3.1 AI"""
+def get_ai_response(user_input, conversation_history):
+    """Get response from Llama 3.1 AI with memory and system prompt"""
     try:
+        # Build context from conversation history
+        context_messages = []
+        
+        # Add system prompt
+        context_messages.append(f"System: {ALFRED_SYSTEM_PROMPT}\n")
+        
+        # Add recent conversation history (last 20 exchanges for context)
+        recent_history = conversation_history[-20:] if len(conversation_history) > 20 else conversation_history
+        
+        for msg in recent_history:
+            context_messages.append(f"Master Can: {msg['user']}")
+            context_messages.append(f"Alfred: {msg['alfred']}")
+        
+        # Build the full prompt
+        full_context = "\n".join(context_messages)
+        full_prompt = f"{full_context}\n\nMaster Can: {user_input}\nAlfred:"
+        
+        # Get response from Llama
         response = ollama.generate(
             model='llama3.1',
-            prompt=user_input,
+            prompt=full_prompt,
             stream=False
         )
         return response['response'].strip()
     except Exception as e:
-        return f"I encountered an error: {str(e)}"
+        return f"I appear to have encountered a technical difficulty, Master Can. My apologies. The error reads: {str(e)}"
 
 if __name__ == '__main__':
     print("=" * 70)
-    print("ALFRED - Local Voice Assistant (Phase 1+2+3: Ear + Mouth + Brain)")
+    print("ALFRED - Local Voice Assistant (Phase 1+2+3+5: Ear + Mouth + Brain + Memory)")
     print("=" * 70)
+    
+    # Load conversation history at startup
+    print("\n[INIT] Loading conversation memory...")
+    conversation_history = load_conversation_history()
+    print(f"  - Loaded {len(conversation_history)} previous conversations")
+    if len(conversation_history) > 0:
+        speak("I have reviewed my previous notes, Master Can. I am ready to continue.")
+    else:
+        speak("Systems online. Ready for duty, Master Can.")
+    
     print("\nInitializing Local Voice Assistant...")
     print(f"  Project Root: {PROJECT_ROOT}")
     print(f"  Alfred Model: {ALFRED_MODEL_PATH.name} ({'Found' if ALFRED_MODEL_PATH.exists() else 'NOT FOUND'})")
@@ -191,13 +276,17 @@ if __name__ == '__main__':
             else:
                 # Use Llama 3.1 AI to generate response
                 print("[THINKING] Processing with Llama 3.1...")
-                ai_response = get_ai_response(transcribed_text)
+                ai_response = get_ai_response(transcribed_text, conversation_history)
                 
                 # Truncate long responses for speech (keep it under 2 minutes)
                 if len(ai_response) > 500:
                     ai_response = ai_response[:500] + "..."
                 
                 speak(ai_response)
+                
+                # Save to conversation history
+                conversation_history = add_to_history(transcribed_text, ai_response, conversation_history)
+                print(f"[MEMORY] Conversation saved. Total exchanges: {len(conversation_history)}")
                 
     except KeyboardInterrupt:
         print("\n[SHUTDOWN] Interrupted by user")
