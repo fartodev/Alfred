@@ -13,7 +13,7 @@ if sys.platform == 'win32':
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
 # Set the path to the alfred.onnx wake word model
-PROJECT_ROOT = Path(__file__).parent.parent  # Goes from venv/ to Project_Alfred/
+PROJECT_ROOT = Path(__file__).parent  # Now main.py is in project root
 ALFRED_MODEL_PATH = PROJECT_ROOT / "alfred.onnx"
 
 # Add the project root to environment so openWakeWord can find the model
@@ -26,6 +26,7 @@ import os
 import subprocess
 import winsound
 import threading
+import ollama
 
 # ============================================================
 # VOICE CONFIGURATION - Change this to try different voices
@@ -100,9 +101,21 @@ def speak(text):
     except Exception as e:
         print(f"[TTS ERROR] {e}")
 
+def get_ai_response(user_input):
+    """Get response from Llama 3.1 AI"""
+    try:
+        response = ollama.generate(
+            model='llama3.1',
+            prompt=user_input,
+            stream=False
+        )
+        return response['response'].strip()
+    except Exception as e:
+        return f"I encountered an error: {str(e)}"
+
 if __name__ == '__main__':
     print("=" * 70)
-    print("ALFRED - Local Voice Assistant (Phase 1+2: Ear + Mouth)")
+    print("ALFRED - Local Voice Assistant (Phase 1+2+3: Ear + Mouth + Brain)")
     print("=" * 70)
     print("\nInitializing Local Voice Assistant...")
     print(f"  Project Root: {PROJECT_ROOT}")
@@ -170,21 +183,21 @@ if __name__ == '__main__':
             
             print(f"\n[USER] {transcribed_text}")
             
-            # Phase 2: Simple response logic with TTS
+            # Phase 3: Use AI for intelligent responses
             if "exit" in transcribed_text.lower() or "quit" in transcribed_text.lower():
                 speak("Goodbye, Sir. Until next time.")
                 print("\n[SHUTDOWN] Goodbye!")
                 break
-            elif "time" in transcribed_text.lower():
-                from datetime import datetime
-                current_time = datetime.now().strftime("%I:%M %p")
-                speak(f"The current time is {current_time}")
-            elif "hello" in transcribed_text.lower() or "hi" in transcribed_text.lower():
-                speak("Hello! I'm Alfred, your personal assistant. How can I help you today?")
-            elif "how are you" in transcribed_text.lower():
-                speak("I'm functioning perfectly, thank you for asking. How can I assist you?")
             else:
-                speak(f"You said: {transcribed_text}. I'm still learning to respond to that.")
+                # Use Llama 3.1 AI to generate response
+                print("[THINKING] Processing with Llama 3.1...")
+                ai_response = get_ai_response(transcribed_text)
+                
+                # Truncate long responses for speech (keep it under 2 minutes)
+                if len(ai_response) > 500:
+                    ai_response = ai_response[:500] + "..."
+                
+                speak(ai_response)
                 
     except KeyboardInterrupt:
         print("\n[SHUTDOWN] Interrupted by user")
