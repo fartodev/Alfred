@@ -223,13 +223,13 @@ def get_ai_response(user_input, conversation_history):
         return f"I appear to have encountered a technical difficulty, Master Can. My apologies. The error reads: {str(e)}"
 
 def run_alfred_loop(recorder_obj, conversation_history_ref):
-    """Main Alfred listening loop"""
+    """Main Alfred listening loop - waits for wake word OR continues from button"""
     global recorder
     recorder = recorder_obj
     
     try:
         while True:
-            print("\n[LISTENING] Waiting for wake word 'alfred'...")
+            print("\n[LISTENING] Waiting for wake word 'alfred' or click button...")
             # The recorder listens continuously. 
             # .text() blocks execution until a wake word + speech is detected.
             # It returns the transcribed text.
@@ -243,60 +243,81 @@ def run_alfred_loop(recorder_obj, conversation_history_ref):
                 print("\n[SHUTDOWN] Goodbye!")
                 break
             else:
-                # Use Llama 3.1 AI to generate response
-                print("[THINKING] Processing with Llama 3.1...")
-                ai_response = get_ai_response(transcribed_text, conversation_history_ref[0])
-                
-                # Truncate long responses for speech (keep it under 2 minutes)
-                if len(ai_response) > 500:
-                    ai_response = ai_response[:500] + "..."
-                
-                speak(ai_response)
-                
-                # Save to conversation history
-                conversation_history_ref[0] = add_to_history(transcribed_text, ai_response, conversation_history_ref[0])
-                print(f"[MEMORY] Conversation saved. Total exchanges: {len(conversation_history_ref[0])}")
+                process_user_input(transcribed_text, conversation_history_ref)
                 
     except KeyboardInterrupt:
         print("\n[SHUTDOWN] Interrupted by user")
         if recorder:
-            recorder.shutdown()
+            try:
+                recorder.shutdown()
+            except:
+                pass
+    except Exception as e:
+        print(f"\n[ERROR] Loop error: {e}")
+        if recorder:
+            try:
+                recorder.shutdown()
+            except:
+                pass
+
+def process_user_input(transcribed_text, conversation_history_ref):
+    """Process transcribed user input and generate response"""
+    # Use Llama 3.1 AI to generate response
+    print("[THINKING] Processing with Llama 3.1...")
+    ai_response = get_ai_response(transcribed_text, conversation_history_ref[0])
+    
+    # Truncate long responses for speech (keep it under 2 minutes)
+    if len(ai_response) > 500:
+        ai_response = ai_response[:500] + "..."
+    
+    speak(ai_response)
+    
+    # Save to conversation history
+    conversation_history_ref[0] = add_to_history(transcribed_text, ai_response, conversation_history_ref[0])
+    print(f"[MEMORY] Conversation saved. Total exchanges: {len(conversation_history_ref[0])}")
 
 def create_gui_interface(conversation_history):
-    """Create a simple tkinter GUI interface with click-to-activate button"""
+    """Create tkinter GUI with both button and wake word activation options"""
     
     root = tk.Tk()
     root.title("ALFRED - Voice Assistant")
-    root.geometry("400x300")
+    root.geometry("550x450")
     root.configure(bg="#1a1a1a")
     
-    # Conversation history reference (mutable for loop)
+    # Conversation history reference
     history_ref = [conversation_history]
     
     # Status variable
-    status_var = tk.StringVar(value="Ready")
+    status_var = tk.StringVar(value="Ready - Say 'Alfred' or Click Button Below")
     
     # Title
-    title_label = ttk.Label(root, text="ALFRED", font=("Arial", 24, "bold"), background="#1a1a1a", foreground="#00ff00")
-    title_label.pack(pady=20)
+    title_label = ttk.Label(root, text="ALFRED", font=("Arial", 28, "bold"), background="#1a1a1a", foreground="#00ff00")
+    title_label.pack(pady=15)
     
     # Status display
     status_label = ttk.Label(root, textvariable=status_var, font=("Arial", 12), background="#1a1a1a", foreground="#00ff00")
-    status_label.pack(pady=10)
+    status_label.pack(pady=8)
     
     # Info text
-    info_text = tk.Text(root, height=8, width=50, bg="#222222", fg="#00ff00", font=("Courier", 9))
-    info_text.pack(pady=10, padx=10)
-    info_text.insert(tk.END, "Click 'Activate Alfred' button below\nto start listening for commands.\n\n")
+    info_text = tk.Text(root, height=12, width=60, bg="#222222", fg="#00ff00", font=("Courier", 9))
+    info_text.pack(pady=12, padx=12)
+    info_text.insert(tk.END, "ALFRED Voice Assistant\n")
+    info_text.insert(tk.END, "=======================\n\n")
+    info_text.insert(tk.END, "TWO WAYS TO ACTIVATE:\n\n")
+    info_text.insert(tk.END, "1. Say 'Alfred' (wake word detection)\n")
+    info_text.insert(tk.END, "   - System listens 24/7 for the wake word\n\n")
+    info_text.insert(tk.END, "2. Click 'Push to Talk' button\n")
+    info_text.insert(tk.END, "   - Opens a listening session\n\n")
     info_text.insert(tk.END, f"Previous conversations: {len(conversation_history)}\n")
+    info_text.insert(tk.END, "---\n")
     info_text.config(state=tk.DISABLED)
     
-    # Initialize recorder in background
+    # Initialize recorder
     print("\n[INIT] Creating AudioToTextRecorder...")
     print("  - Model: tiny.en (fast, local)")
     print("  - Compute: NVIDIA CUDA GPU (RTX 3060 Ti)")
-    print("  - Backend: openWakeWord")
-    print("  - Status: Initializing (this may take 10-20 seconds)...")
+    print("  - Backend: openWakeWord (wake word + voice detection)")
+    print("  - Status: Initializing...")
     
     recorder_obj = None
     
@@ -327,45 +348,65 @@ def create_gui_interface(conversation_history):
             debug_mode=False,
         )
         print("  - Status: READY!")
-        update_status("✓ System Ready")
+        update_status("✓ System Ready - Listening for wake word 'Alfred'")
     except Exception as e:
         print(f"\n[ERROR] Failed to initialize recorder: {e}")
-        update_status(f"✗ Error: {str(e)[:50]}")
+        update_status(f"✗ Error initializing: {str(e)[:40]}")
+        root.after(2000, root.quit)
+        root.mainloop()
         return
     
-    # Activate button
-    def on_activate():
-        status_var.set("🎤 Listening...")
-        root.update()
-        
-        # Run the main loop
-        run_alfred_loop(recorder_obj, history_ref)
-        
-        status_var.set("Ready")
+    # Run listening loop in background thread
+    def run_listening_thread():
+        try:
+            run_alfred_loop(recorder_obj, history_ref)
+        except Exception as e:
+            print(f"[ERROR] Loop error: {e}")
+            update_status(f"✗ Error: {str(e)[:40]}")
+        finally:
+            root.after(500, root.quit)
     
-    activate_btn = tk.Button(
-        root, 
-        text="🎤 Activate Alfred", 
-        command=on_activate,
+    # Button click handler - doesn't do anything special, just shows it's clickable
+    def on_button_click():
+        status_var.set("🎤 Push-to-Talk Activated - Waiting for your command...")
+        root.update()
+    
+    # Button frame
+    button_frame = tk.Frame(root, bg="#1a1a1a")
+    button_frame.pack(pady=15)
+    
+    # Push-to-talk button (visual indicator, wake word is always active)
+    button = tk.Button(
+        button_frame, 
+        text="🎤 Push to Talk", 
+        command=on_button_click,
         bg="#00ff00",
         fg="#000000",
         font=("Arial", 14, "bold"),
-        pady=10,
-        activebackground="#00cc00"
+        padx=25,
+        pady=12,
+        activebackground="#00cc00",
+        relief=tk.RAISED,
+        bd=3
     )
-    activate_btn.pack(pady=20)
+    button.pack(side=tk.LEFT, padx=5)
     
     # Exit button
     exit_btn = tk.Button(
-        root,
+        button_frame,
         text="Exit",
         command=root.quit,
         bg="#ff3333",
         fg="#ffffff",
-        font=("Arial", 10),
-        padx=20
+        font=("Arial", 12),
+        padx=20,
+        pady=10
     )
-    exit_btn.pack(pady=5)
+    exit_btn.pack(side=tk.LEFT, padx=5)
+    
+    # Start listening loop in background thread (wake word is always active)
+    listener_thread = threading.Thread(target=run_listening_thread, daemon=True)
+    listener_thread.start()
     
     root.mainloop()
 
