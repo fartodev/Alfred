@@ -1,33 +1,43 @@
-# Alfred - Local Voice Assistant
+# ALFRED - Private AI Butler
 
-A fully-functional **J.A.R.V.I.S.-style voice assistant** built entirely on your local machine with GPU acceleration. Alfred listens for voice commands, understands speech, and responds with natural language - all without sending data to the cloud.
+A sophisticated local AI assistant inspired by Batman's butler. Runs entirely offline using Mistral 7B and LLaVA for vision.
 
-## Features
+## Current Features (Phase 3 - Complete)
 
-✅ **Phase 1: Auditory Cortex (Ear)**
-- Wake word detection using OpenWakeWord custom model (`alfred.onnx`)
-- Real-time speech-to-text using Faster-Whisper (tiny.en model)
-- GPU-accelerated inference (NVIDIA CUDA)
+✅ **Core AI**
+- Mistral 7B model (local, powerful)
+- 299+ conversations with context memory
+- Hallucination prevention with grounding rules
+- Dark Knight butler personality training (46 dialogue patterns)
 
-✅ **Phase 2: Voice (Mouth)**
-- Text-to-speech using Microsoft Edge TTS (edge-tts)
-- Natural British male voice (RyanNeural)
-- Silent background playback with no file popups
+✅ **Input Methods**
+- Wake word detection ("Alfred")
+- Push-to-talk (Web Speech API)
+- Text input mode
 
-🔄 **Phase 3: Brain (In Development)**
-- Local LLM integration using Ollama
-- Llama 3.1 model for intelligent responses
-- Context-aware conversation
+✅ **Output & Personality**
+- TTS with Thomas neural voice
+- Real-time responses
+- Context-aware butler replies
 
-## Project Origin
+✅ **Vision**
+- LLaVA local image analysis
+- Image + text together support
+- Screenshot analysis capability
 
-This project is inspired by and builds upon the foundational work from:
-- **Main Repository**: [JARVIS-like Voice Assistant Framework](https://github.com/example/jarvis-framework)
-- **Concept**: Building an open-source, privacy-first voice assistant
+✅ **Learning System**
+- Bulk import from .json/.txt files
+- Conversation memory with topic detection
+- User correction learning
 
-## Tech Stack
+✅ **UI/UX**
+- Modern dark theme
+- Scrollable chat with visible scrollbar
+- System log panel
+- Mode indicators
+- Image preview with camera button
 
-- **Python 3.11.9**
+## Architecture
 - **Speech-to-Text**: Faster-Whisper + CTranslate2 (NVIDIA CUDA 11.8)
 - **Text-to-Speech**: edge-tts (Microsoft cloud voices)
 - **Wake Word**: OpenWakeWord with custom `alfred.onnx` model
