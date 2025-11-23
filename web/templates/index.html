@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ALFRED</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Panel: Status Log -->
+        <aside class="status-panel">
+            <div class="panel-header">System Log</div>
+            <div class="log-content" id="systemLog">
+                <div class="log-line"><span class="log-prefix">[INIT]</span> System initializing...</div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="top-bar">
+                <div class="alfred-header">
+                    <img src="/portrait" alt="ALFRED" class="portrait">
+                    <div class="header-text">
+                        <h1>ALFRED</h1>
+                        <p>Your loyal butler</p>
+                    </div>
+                </div>
+                <div class="header-buttons">
+                    <button id="settingsBtn" class="btn-icon" title="Change mode">⚙️</button>
+                    <button id="micBtn" class="btn-icon" title="Push to talk">🎙️</button>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div class="chat-area">
+                <div class="messages" id="messagesContainer">
+                    <div class="welcome">
+                        <p>At your service, Master Bruce.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="input-area">
+                <div class="input-controls">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        class="input-field" 
+                        placeholder="Speak your mind, sir..."
+                        autocomplete="off"
+                    >
+                    <label class="btn-upload" title="Upload image for analysis">
+                        📷
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                    </label>
+                    <label class="btn-upload" title="Bulk learn from .txt/.json">
+                        📚
+                        <input type="file" id="bulkLearnInput" accept=".txt,.json" style="display: none;">
+                    </label>
+                    <button id="sendBtn" class="btn-send">Send</button>
+                </div>
+                <div id="imagePreview" class="image-preview"></div>
+            </div>
+
+            <!-- Mode Indicator -->
+            <div class="mode-indicator" id="modeBadge">🎤 Wake Word</div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
