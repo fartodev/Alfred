@@ -18,6 +18,9 @@ import ollama
 # Import core Alfred functions from main.py
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Import translation system
+from translation import detect_language, translate_text, speak_turkish_async, save_translation_correction, get_language_name
+
 app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
 
 # Global state
@@ -37,7 +40,9 @@ state = {
     'ptt_thread': None,
     'ptt_active': False,
     'wake_word_stop': False,
-    'recorder_lock': threading.Lock()
+    'recorder_lock': threading.Lock(),
+    'language': 'en',  # Current language (en, tr, de, fr, es)
+    'last_english_response': '',  # Store for bilingual display
 }
 
 def wake_word_listener():
@@ -253,37 +258,86 @@ def cycle_mode():
 
 @app.route('/api/chat', methods=['POST'])
 def send_message():
-    """Send a text message to Alfred"""
+    """Send a text message to Alfred with multi-language support"""
     data = request.json
     user_text = data.get('message', '').strip()
+    correction_mode = data.get('correction_mode', False)  # Is this a translation correction?
     
     if not user_text:
         return jsonify({'error': 'Empty message'}), 400
     
-    # Import get_ai_response here to avoid circular imports
     from main import get_ai_response, speak, save_conversation_history
     
     try:
-        # Get AI response
-        response = get_ai_response(user_text, state['conversation_history'])
+        # Detect input language
+        detected_lang = detect_language(user_text)
+        print(f"[DETECT] User text: '{user_text}' -> Detected language: {detected_lang}")
         
-        # Save to history
+        # Check for translation correction pattern
+        if correction_mode and state['last_english_response']:
+            # Save the correction
+            save_translation_correction(state['last_english_response'], user_text, 'user_correction')
+            return jsonify({
+                'success': True,
+                'message': 'Translation correction saved',
+                'user': user_text,
+                'alfred': 'Tessekkür ederim. Bundan sonra daha iyi çeviri yapacağım.'
+            })
+        
+        # Translate to English if needed
+        if detected_lang != 'en':
+            print(f"[TRANSLATE] Converting {detected_lang.upper()} to EN...")
+            english_text = translate_text(user_text, source_lang=detected_lang, target_lang='en')
+            print(f"[TRANSLATION] {detected_lang.upper()}: {user_text}")
+            print(f"[TRANSLATION] EN: {english_text}")
+        else:
+            english_text = user_text
+            detected_lang = 'en'
+            print(f"[TRANSLATE] English input, no translation needed")
+        
+        # Get AI response in English
+        response_en = get_ai_response(english_text, state['conversation_history'])
+        state['last_english_response'] = response_en
+        
+        # Store conversation in English
         state['conversation_history'].append({
             "timestamp": datetime.now().isoformat(),
-            "user": user_text,
-            "alfred": response
+            "user": english_text,
+            "alfred": response_en,
+            "original_language": detected_lang
         })
         save_conversation_history(state['conversation_history'])
         
-        # Speak response in background
-        threading.Thread(target=speak, args=(response,), daemon=True).start()
+        # Translate response if needed
+        if detected_lang != 'en':
+            print(f"[TRANSLATE] Converting response EN to {detected_lang.upper()}...")
+            response = translate_text(response_en, source_lang='en', target_lang=detected_lang)
+            print(f"[TRANSLATION] Response to {detected_lang.upper()}: {response}")
+            
+            # Speak Turkish response
+            if detected_lang == 'tr':
+                speak_turkish_async(response)
+            # Could add other language TTS here
+        else:
+            response = response_en
+            # Speak English response (default)
+            threading.Thread(target=speak, args=(response,), daemon=True).start()
         
-        return jsonify({
+        # Return bilingual response if Turkish
+        result = {
             'user': user_text,
             'alfred': response,
-            'timestamp': datetime.now().isoformat()
-        })
+            'timestamp': datetime.now().isoformat(),
+            'language': detected_lang
+        }
+        
+        # Include English version for non-English languages
+        if detected_lang != 'en':
+            result['alfred_en'] = response_en
+        
+        return jsonify(result)
     except Exception as e:
+        print(f"[CHAT ERROR] {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/history', methods=['GET'])

@@ -1,0 +1,7 @@
+[
+  {
+    "topic": "example_topic",
+    "context": "This is an example of how Alfred remembers conversation context",
+    "timestamp": "2025-01-01T12:00:00"
+  }
+]

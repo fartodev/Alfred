@@ -9,12 +9,15 @@ class AlfredUI {
         this.systemLog = document.getElementById('systemLog');
         this.imageInput = document.getElementById('imageInput');
         this.bulkLearnInput = document.getElementById('bulkLearnInput');
+        this.languageSelector = document.getElementById('languageSelector');
         this.imagePreview = document.getElementById('imagePreview');
         
         this.currentMode = 'wake_word';
+        this.currentLanguage = 'en';  // Track current language
         this.isRecording = false;
         this.lastShownTranscription = '';
         this.lastShownAlfredResponse = '';
+        this.lastEnglishResponse = '';  // Store English for corrections
         this.selectedImage = null;
         
         // Web Speech API setup
@@ -101,6 +104,11 @@ class AlfredUI {
         // Bulk learn input listener
         this.bulkLearnInput.addEventListener('change', (e) => this.handleBulkLearn(e));
         
+        // Language selector listener
+        if (this.languageSelector) {
+            this.languageSelector.addEventListener('change', (e) => this.changeLanguage(e.target.value));
+        }
+        
         this.addLog('[INIT]', 'System initializing...', 'init');
         this.loadHistory();
         this.getGreeting();
@@ -108,6 +116,11 @@ class AlfredUI {
         
         // Poll for updates
         setInterval(() => this.updateStatus(), 1000);
+    }
+    
+    changeLanguage(lang) {
+        this.currentLanguage = lang;
+        this.addLog('[LANG]', `Language changed to ${lang.toUpperCase()}`, 'info');
     }
     
     addLog(prefix, message, type = 'info') {
@@ -140,22 +153,24 @@ class AlfredUI {
         
         // If image exists, analyze it AND send text if present
         if (this.selectedImage) {
-            const imageText = message; // Capture text before clearing
-            this.messageInput.value = '';  // Clear text input
+            const imageText = message;
+            this.messageInput.value = '';
             this.removeWelcome();
             
-            // First send text message if present
             if (imageText) {
                 this.addMessage('user', imageText);
                 this.addLog('[USER]', imageText.substring(0, 40) + (imageText.length > 40 ? '...' : ''), 'info');
             }
             
-            // Then analyze image
             this.analyzeImage();
             return;
         }
         
-        // Only text message, no image
+        // Check if this is a translation correction (starts with specific pattern)
+        const isCorrectionMode = message.toLowerCase().includes('çevir') || 
+                                  message.toLowerCase().includes('translate') ||
+                                  (this.currentLanguage !== 'en' && this.lastEnglishResponse);
+        
         if (message) {
             this.messageInput.value = '';
             this.removeWelcome();
@@ -167,7 +182,10 @@ class AlfredUI {
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
+                    body: JSON.stringify({ 
+                        message,
+                        correction_mode: isCorrectionMode
+                    })
                 });
                 
                 const data = await response.json();
@@ -176,7 +194,15 @@ class AlfredUI {
                     this.addMessage('error', data.error);
                     this.addLog('[ERROR]', data.error, 'error');
                 } else {
-                    this.addMessage('alfred', data.alfred);
+                    // Store English response for potential corrections
+                    if (data.alfred_en) {
+                        this.lastEnglishResponse = data.alfred_en;
+                        // Show bilingual response
+                        this.addMessage('alfred', `🇬🇧 ${data.alfred_en}\n\n🇹🇷 ${data.alfred}`);
+                        this.addLog('[TRANSLATION]', `EN→TR: Translated response`, 'success');
+                    } else {
+                        this.addMessage('alfred', data.alfred);
+                    }
                     this.addLog('[ALFRED]', 'Response sent', 'success');
                 }
             } catch (error) {

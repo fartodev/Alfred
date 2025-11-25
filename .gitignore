@@ -1,3 +1,4 @@
+# Python
 venv/
 __pycache__/
 *.pyc
@@ -5,10 +6,31 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# IDE
 .DS_Store
+.idea/
+.vscode/
+
+# Audio files (temporary)
 *.wav
 *.mp3
 temp_alfred*
+temp_turkish*
+
+# Logs
 *.log
-.idea/
-.vscode/
+app_log.txt
+realtimesst.log
+
+# Sensitive data - DO NOT PUSH TO PUBLIC
+alfred_memory.json
+alfred_learning.json
+alfred_training.json
+DEVELOPMENT_ROADMAP.md
+README_PRIV.md
+script.txt
+
+# Models (too large for GitHub)
+alfred.onnx
+rvc_models/

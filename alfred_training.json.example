@@ -1,0 +1,9 @@
+{
+  "conversations": [
+    {
+      "user": "Example user input",
+      "alfred": "Example Alfred response",
+      "timestamp": "2025-01-01T12:00:00"
+    }
+  ]
+}
