@@ -1,0 +1,9 @@
+{
+  "facts": [
+    {
+      "question": "example question",
+      "answer": "example answer",
+      "learned_at": "2025-01-01T12:00:00"
+    }
+  ]
+}
